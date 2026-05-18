@@ -14,13 +14,20 @@ const app = express();
 
 // ── CORS ──────────────────────────────────────
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:5173',
-  'https://costeasy.vercel.app',   // update with your Vercel URL
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://costeasy-cloud.vercel.app',
+  process.env.FRONTEND_URL,
 ];
 
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return cb(null, true);
+    // Allow any vercel.app subdomain (covers preview deployments too)
+    if (origin.endsWith('.vercel.app')) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    console.warn('CORS blocked origin:', origin);
     cb(new Error('Not allowed by CORS'));
   },
   credentials: true,
