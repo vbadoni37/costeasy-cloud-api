@@ -9,6 +9,12 @@ const materialsRoutes = require('./routes/materials');
 const costSheetsRoutes = require('./routes/costSheets');
 const overheadRoutes = require('./routes/overhead');
 const adminRoutes = require('./routes/admin');
+const itemMasterRoutes = require('./routes/itemMaster');
+const priceMasterRoutes = require('./routes/priceMaster');
+const productMasterRoutes = require('./routes/productMaster');
+const bomRoutes = require('./routes/bom');
+const codeMappingRoutes  = require('./routes/codeMapping');
+const valueMappingRoutes = require('./routes/valueMapping');
 
 const app = express();
 
@@ -49,6 +55,12 @@ app.use('/api/materials', materialsRoutes);
 app.use('/api/cost-sheets', costSheetsRoutes);
 app.use('/api/overhead', overheadRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/item-master', itemMasterRoutes);
+app.use('/api/price-master', priceMasterRoutes);
+app.use('/api/product-master', productMasterRoutes);
+app.use('/api/bom', bomRoutes);
+app.use('/api/code-mapping', codeMappingRoutes);
+app.use('/api/value-mapping', valueMappingRoutes);
 
 // ── Global Error Handler ──────────────────────
 app.use((err, req, res, next) => {
