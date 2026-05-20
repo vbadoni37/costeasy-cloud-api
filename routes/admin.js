@@ -41,56 +41,66 @@ router.post('/generate-key', requireAdmin, async (req, res) => {
     return res.status(500).json({ error: 'Failed to store license key: ' + error.message });
   }
 
-  // ── Send key via email ──────────────────────────────────────
+  // ── Send key via email (fire-and-forget, 5s timeout) ────────
   let emailSent = false;
-  try {
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: 465,
-      secure: true,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
+  const emailPromise = new Promise(async (resolve) => {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+        socketTimeout: 5000,
+      });
 
-    await transporter.sendMail({
-      from: process.env.SMTP_FROM,
-      to: customer_email,
-      subject: '🔑 Your CostEasy Cloud License Key',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #1e3a5f, #2563eb); padding: 32px; border-radius: 12px 12px 0 0;">
-            <h1 style="color: white; margin: 0; font-size: 24px;">CostEasy Cloud</h1>
-            <p style="color: #93c5fd; margin: 8px 0 0 0;">Pharma Product Costing Software</p>
-          </div>
-          <div style="background: #f8fafc; padding: 32px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0;">
-            <h2 style="color: #1e293b;">Your License Key is Ready! 🎉</h2>
-            ${company_name ? `<p style="color: #475569;">Dear <strong>${company_name}</strong> team,</p>` : ''}
-            <p style="color: #475569;">Thank you for choosing CostEasy Cloud. Your license key is:</p>
-            
-            <div style="background: white; border: 2px dashed #2563eb; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
-              <code style="font-size: 28px; font-weight: bold; letter-spacing: 4px; color: #1e3a5f;">${key}</code>
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM,
+        to: customer_email,
+        subject: '🔑 Your CostEasy Cloud License Key',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #1e3a5f, #2563eb); padding: 32px; border-radius: 12px 12px 0 0;">
+              <h1 style="color: white; margin: 0; font-size: 24px;">CostEasy Cloud</h1>
+              <p style="color: #93c5fd; margin: 8px 0 0 0;">Pharma Product Costing Software</p>
             </div>
-            
-            <h3 style="color: #1e293b;">How to Activate:</h3>
-            <ol style="color: #475569; line-height: 1.8;">
-              <li>Log in to CostEasy Cloud at your company URL</li>
-              <li>Click <strong>"Enter License Key"</strong> on the dashboard</li>
-              <li>Enter the key above and click <strong>Activate</strong></li>
-              <li>Your license will be valid for <strong>1 year</strong> from today</li>
-            </ol>
-            
-            <div style="background: #fef9c3; border: 1px solid #fde047; border-radius: 8px; padding: 16px; margin: 24px 0;">
-              <strong>⚠️ Important:</strong> Keep this key safe. It is linked to your company account and cannot be reused on another account.
+            <div style="background: #f8fafc; padding: 32px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0;">
+              <h2 style="color: #1e293b;">Your License Key is Ready! 🎉</h2>
+              ${company_name ? `<p style="color: #475569;">Dear <strong>${company_name}</strong> team,</p>` : ''}
+              <p style="color: #475569;">Thank you for choosing CostEasy Cloud. Your license key is:</p>
+              
+              <div style="background: white; border: 2px dashed #2563eb; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
+                <code style="font-size: 28px; font-weight: bold; letter-spacing: 4px; color: #1e3a5f;">${key}</code>
+              </div>
+              
+              <h3 style="color: #1e293b;">How to Activate:</h3>
+              <ol style="color: #475569; line-height: 1.8;">
+                <li>Log in to CostEasy Cloud at <a href="https://costeasy-cloud.vercel.app">costeasy-cloud.vercel.app</a></li>
+                <li>Click <strong>"Enter License Key"</strong> on the dashboard</li>
+                <li>Enter the key above and click <strong>Activate</strong></li>
+                <li>Your license will be valid for <strong>1 year</strong> from today</li>
+              </ol>
+              
+              <div style="background: #fef9c3; border: 1px solid #fde047; border-radius: 8px; padding: 16px; margin: 24px 0;">
+                <strong>⚠️ Important:</strong> Keep this key safe. It is linked to your company account and cannot be reused on another account.
+              </div>
+              
+              <p style="color: #64748b; font-size: 14px;">For support, reply to this email or contact us at <a href="mailto:blvttech@gmail.com">blvttech@gmail.com</a></p>
             </div>
-            
-            <p style="color: #64748b; font-size: 14px;">For support, reply to this email or contact us at <a href="mailto:blvttech@gmail.com">blvttech@gmail.com</a></p>
           </div>
-        </div>
-      `,
-    });
-    emailSent = true;
-  } catch (emailErr) {
-    console.error('Email send failed:', emailErr.message);
-  }
+        `,
+      });
+      resolve(true);
+    } catch (emailErr) {
+      console.error('Email send failed:', emailErr.message);
+      resolve(false);
+    }
+  });
+
+  // Wait max 6 seconds for email, then respond anyway
+  const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(false), 6000));
+  emailSent = await Promise.race([emailPromise, timeoutPromise]);
 
   res.json({
     key,
