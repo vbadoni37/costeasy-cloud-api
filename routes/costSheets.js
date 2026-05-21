@@ -333,7 +333,16 @@ router.put('/:id', async (req, res) => {
       margin_pct:         parseFloat(margin_pct || 5),
       selling_price_per_sku: calc.selling_price_sku,
       final_price_per_sku:   calc.selling_price_sku,
-      margin_basis: (overheads || []).reduce((a, o) => ({ ...a, [o.key || o.label]: o.in_margin }), {}),
+      margin_basis: (overheads || []).reduce((a, o) => ({
+        ...a,
+        [o.key || o.label]: {
+          value: parseFloat(o.value || 0),
+          in_margin: o.in_margin || false,
+          type: o.type || 'fixed',
+          unit: o.unit || '₹',
+          label: o.label || o.key,
+        }
+      }), {}),
       last_edited_by: req.user.name || req.user.email,
       last_edited_at: new Date().toISOString(),
       updated_at:     new Date().toISOString(),
