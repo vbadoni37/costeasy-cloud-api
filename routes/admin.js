@@ -146,4 +146,45 @@ router.get('/users', requireAdmin, async (req, res) => {
   res.json(data);
 });
 
+// ── DELETE /api/admin/users/:id ──────────────────────────────
+router.delete('/users/:id', requireAdmin, async (req, res) => {
+  const userId = req.params.id;
+
+  // Get the user first to find their company
+  const { data: user, error: fetchErr } = await supabase
+    .from('users').select('*').eq('id', userId).single();
+
+  if (fetchErr || !user)
+    return res.status(404).json({ error: 'User not found' });
+
+  // Delete the user
+  const { error: delErr } = await supabase
+    .from('users').delete().eq('id', userId);
+
+  if (delErr) return res.status(500).json({ error: delErr.message });
+
+  // Check if company has other users
+  const { data: remaining } = await supabase
+    .from('users').select('id').eq('company_id', user.company_id);
+
+  // If no users left in company, delete the company too
+  if (!remaining || remaining.length === 0) {
+    await supabase.from('companies').delete().eq('id', user.company_id);
+  }
+
+  res.json({ message: `User ${user.email} deleted successfully.` });
+});
+
+// ── GET /api/admin/companies ─────────────────────────────────
+router.get('/companies', requireAdmin, async (req, res) => {
+  const { data, error } = await supabase
+    .from('companies')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 module.exports = router;
+
