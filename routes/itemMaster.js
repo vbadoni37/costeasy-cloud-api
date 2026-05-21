@@ -147,10 +147,15 @@ router.post('/upload', requireAdmin, async (req, res) => {
       };
     });
 
+    // Deduplicate by product_code — keep last occurrence if Excel has duplicates
+    const deduped = Object.values(
+      cleaned.reduce((map, row) => { map[row.product_code] = row; return map; }, {})
+    );
+
     // Upsert on (product_code, company_id)
     const { data, error } = await supabase
       .from('material_master')
-      .upsert(cleaned, { onConflict: 'product_code,company_id', ignoreDuplicates: false })
+      .upsert(deduped, { onConflict: 'product_code,company_id', ignoreDuplicates: false })
       .select();
     if (error) throw error;
 
