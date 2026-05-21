@@ -164,7 +164,6 @@ router.post('/upload', requireAdmin, async (req, res) => {
         category:       row.category     ? String(row.category).trim()     : (material.category || 'RM'),
         sub_category:   row.sub_category ? String(row.sub_category).trim() : null,
         is_frozen:      false,
-        company_id,
       });
     }
 
@@ -331,7 +330,6 @@ router.post('/bulk-upload', requireAdmin, async (req, res) => {
             quantity: qty, uom,
             category: item.category,
             is_frozen: false,
-            company_id,
           });
         }
 
@@ -415,7 +413,6 @@ router.post('/:productId/item', requireAdmin, async (req, res) => {
         quantity:      normQty, uom: normUom,
         category:      category || material.category || 'RM',
         sub_category:  sub_category || null,
-        company_id,
       })
       .select().single();
     if (error) throw error;
