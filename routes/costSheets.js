@@ -260,7 +260,6 @@ router.post('/', async (req, res) => {
         final_price_per_sku: calc.selling_price_sku,
         margin_basis:       defaultOverheads.reduce((a, o) => ({ ...a, [o.key]: o.in_margin }), {}),
         created_by:         req.user.id,
-        created_by_name:    user_name,
         cost_ref_id:        refSheetId || null,
       })
       .select().single();
@@ -414,7 +413,6 @@ router.post('/:id/:action', async (req, res) => {
         sent_to_client:        action === 'offer-client',
         status:                'active',
         created_by:            req.user.id,
-        created_by_name:       user_name,
         company_id,
       });
     }
