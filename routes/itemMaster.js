@@ -181,39 +181,49 @@ router.post('/upload', requireAdmin, async (req, res) => {
       .select();
     if (error) throw error;
 
-    // Auto-create price records for items with initial_price > 0
+    // Auto-create price records for items with initial_price > 0 (BATCH mode)
     const today = new Date().toISOString().split('T')[0];
     const user_name = req.user.name || req.user.email;
     let pricesCreated = 0;
 
-    for (const item of data) {
-      if (item.initial_price > 0) {
-        // Check if price record already exists
-        const { data: existingPrice } = await supabase
-          .from('material_prices')
-          .select('id')
-          .eq('material_id', item.id)
-          .eq('company_id', company_id)
-          .eq('is_latest', true)
-          .maybeSingle();
+    const itemsWithPrice = data.filter(item => item.initial_price > 0);
 
-        if (!existingPrice) {
-          // No price record yet — create initial one
-          await supabase.from('material_prices').insert({
-            material_id: item.id, price: item.initial_price, old_price: 0,
-            padding_percent: 0, is_latest: true,
-            date_of_update: today, created_by_name: user_name, company_id,
-          });
-          await supabase.from('price_change_log').insert({
-            material_id: item.id, material_code: item.product_code,
-            material_name: item.material_name,
-            old_price: 0, new_price: item.initial_price,
-            old_padding_percent: 0, new_padding_percent: 0,
-            changed_by_name: user_name,
-            change_reason: 'Initial price from Item Master upload', company_id,
-          });
-          pricesCreated++;
-        }
+    if (itemsWithPrice.length > 0) {
+      // One query: get all existing latest prices for these items
+      const itemIds = itemsWithPrice.map(i => i.id);
+      const { data: existingPrices } = await supabase
+        .from('material_prices')
+        .select('material_id')
+        .in('material_id', itemIds)
+        .eq('company_id', company_id)
+        .eq('is_latest', true);
+
+      const hasPrice = new Set((existingPrices || []).map(p => p.material_id));
+
+      // Filter to only items that DON'T have a price yet
+      const needsPrice = itemsWithPrice.filter(item => !hasPrice.has(item.id));
+
+      if (needsPrice.length > 0) {
+        // Batch insert prices
+        const priceRows = needsPrice.map(item => ({
+          material_id: item.id, price: item.initial_price, old_price: 0,
+          padding_percent: 0, is_latest: true,
+          date_of_update: today, created_by_name: user_name, company_id,
+        }));
+        await supabase.from('material_prices').insert(priceRows);
+
+        // Batch insert change logs
+        const logRows = needsPrice.map(item => ({
+          material_id: item.id, material_code: item.product_code,
+          material_name: item.material_name,
+          old_price: 0, new_price: item.initial_price,
+          old_padding_percent: 0, new_padding_percent: 0,
+          changed_by_name: user_name,
+          change_reason: 'Initial price from Item Master upload', company_id,
+        }));
+        await supabase.from('price_change_log').insert(logRows);
+
+        pricesCreated = needsPrice.length;
       }
     }
 
@@ -221,7 +231,6 @@ router.post('/upload', requireAdmin, async (req, res) => {
       message: `Successfully uploaded ${data.length} item(s), ${pricesCreated} initial price(s) created in Price Master`,
       inserted: data.length,
       pricesCreated,
-      rows: data,
     });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -229,3 +238,4 @@ router.post('/upload', requireAdmin, async (req, res) => {
 });
 
 module.exports = router;
+
