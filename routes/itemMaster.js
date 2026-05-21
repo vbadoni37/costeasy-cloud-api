@@ -75,12 +75,34 @@ router.post('/', requireAdmin, async (req, res) => {
     if (!product_code || !material_name || !uom)
       return res.status(400).json({ error: 'product_code, material_name, uom are required' });
 
+    const company_id = req.user.company_id;
+    const price = parseFloat(initial_price) || 0;
+
     const { data, error } = await supabase
       .from('material_master')
       .insert({ product_code, material_name, uom, category, sub_category,
-                initial_price: initial_price || 0, company_id: req.user.company_id })
+                initial_price: price, company_id })
       .select().single();
     if (error) throw error;
+
+    // Auto-create initial price record in Price Master
+    if (price > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      await supabase.from('material_prices').insert({
+        material_id: data.id, price, old_price: 0,
+        padding_percent: 0, is_latest: true,
+        date_of_update: today, created_by_name: req.user.name || req.user.email,
+        company_id,
+      });
+      await supabase.from('price_change_log').insert({
+        material_id: data.id, material_code: product_code,
+        material_name, old_price: 0, new_price: price,
+        old_padding_percent: 0, new_padding_percent: 0,
+        changed_by_name: req.user.name || req.user.email,
+        change_reason: 'Initial price from Item Master', company_id,
+      });
+    }
+
     res.status(201).json(data);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -159,9 +181,46 @@ router.post('/upload', requireAdmin, async (req, res) => {
       .select();
     if (error) throw error;
 
+    // Auto-create price records for items with initial_price > 0
+    const today = new Date().toISOString().split('T')[0];
+    const user_name = req.user.name || req.user.email;
+    let pricesCreated = 0;
+
+    for (const item of data) {
+      if (item.initial_price > 0) {
+        // Check if price record already exists
+        const { data: existingPrice } = await supabase
+          .from('material_prices')
+          .select('id')
+          .eq('material_id', item.id)
+          .eq('company_id', company_id)
+          .eq('is_latest', true)
+          .maybeSingle();
+
+        if (!existingPrice) {
+          // No price record yet — create initial one
+          await supabase.from('material_prices').insert({
+            material_id: item.id, price: item.initial_price, old_price: 0,
+            padding_percent: 0, is_latest: true,
+            date_of_update: today, created_by_name: user_name, company_id,
+          });
+          await supabase.from('price_change_log').insert({
+            material_id: item.id, material_code: item.product_code,
+            material_name: item.material_name,
+            old_price: 0, new_price: item.initial_price,
+            old_padding_percent: 0, new_padding_percent: 0,
+            changed_by_name: user_name,
+            change_reason: 'Initial price from Item Master upload', company_id,
+          });
+          pricesCreated++;
+        }
+      }
+    }
+
     res.json({
-      message: `Successfully uploaded ${data.length} item(s)`,
+      message: `Successfully uploaded ${data.length} item(s), ${pricesCreated} initial price(s) created in Price Master`,
       inserted: data.length,
+      pricesCreated,
       rows: data,
     });
   } catch (e) {
