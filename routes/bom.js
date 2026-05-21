@@ -82,7 +82,7 @@ router.get('/:productId', async (req, res) => {
     if (pErr) throw pErr;
 
     const { data: items, error: iErr } = await supabase
-      .from('bom_items')
+      .from('product_bom_items')
       .select('*, material:material_master(id, product_code, material_name, category, sub_category, is_temp_code, erp_code)')
       .eq('product_id', req.params.productId)
       .order('category')
@@ -168,10 +168,10 @@ router.post('/upload', requireAdmin, async (req, res) => {
     }
 
     // 3. Replace existing BOM (delete all then insert)
-    await supabase.from('bom_items').delete().eq('product_id', product_id);
+    await supabase.from('product_bom_items').delete().eq('product_id', product_id);
 
     const { data: inserted, error: insErr } = await supabase
-      .from('bom_items')
+      .from('product_bom_items')
       .insert(newItems)
       .select();
     if (insErr) throw insErr;
@@ -334,9 +334,9 @@ router.post('/bulk-upload', requireAdmin, async (req, res) => {
         }
 
         // Replace existing BOM for this product
-        await supabase.from('bom_items').delete().eq('product_id', product.id);
+        await supabase.from('product_bom_items').delete().eq('product_id', product.id);
         if (bomItems.length > 0) {
-          const { error: insErr } = await supabase.from('bom_items').insert(bomItems);
+          const { error: insErr } = await supabase.from('product_bom_items').insert(bomItems);
           if (insErr) throw insErr;
         }
 
@@ -404,7 +404,7 @@ router.post('/:productId/item', requireAdmin, async (req, res) => {
     }
 
     const { data, error } = await supabase
-      .from('bom_items')
+      .from('product_bom_items')
       .insert({
         product_id:    req.params.productId,
         material_id:   material.id,
@@ -426,7 +426,7 @@ router.put('/:productId/item/:itemId', requireAdmin, async (req, res) => {
     const { quantity, uom, category, sub_category } = req.body;
     const { qty: normQty, uom: normUom } = normalizeUOM(uom || 'Kg', quantity);
     const { data, error } = await supabase
-      .from('bom_items')
+      .from('product_bom_items')
       .update({ quantity: normQty, uom: normUom, category, sub_category })
       .eq('id', req.params.itemId)
       .eq('product_id', req.params.productId)
@@ -440,7 +440,7 @@ router.put('/:productId/item/:itemId', requireAdmin, async (req, res) => {
 router.delete('/:productId/item/:itemId', requireAdmin, async (req, res) => {
   try {
     const { error } = await supabase
-      .from('bom_items')
+      .from('product_bom_items')
       .delete()
       .eq('id', req.params.itemId)
       .eq('product_id', req.params.productId);

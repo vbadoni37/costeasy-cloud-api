@@ -148,7 +148,7 @@ router.post('/', async (req, res) => {
 
     // Get BOM items with latest prices
     const { data: bomItems } = await supabase
-      .from('bom_items')
+      .from('product_bom_items')
       .select('*, material:material_master(id, product_code, material_name, category, uom, is_temp_code)')
       .eq('product_id', product_id);
 
