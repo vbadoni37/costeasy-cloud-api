@@ -90,8 +90,51 @@ router.post('/register', async (req, res) => {
   if (userErr)
     return res.status(500).json({ error: 'Failed to create user' });
 
+  // ── Auto-notify admin about new registration (fire & forget) ──
+  const nodemailer = require('nodemailer');
+  const sendNotification = async () => {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com', port: 465, secure: true,
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        connectionTimeout: 5000, greetingTimeout: 5000, socketTimeout: 5000,
+      });
+
+      // Email TO admin with Reply-To set to customer
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM,
+        to: 'blvttech@gmail.com',
+        replyTo: email.toLowerCase(),
+        subject: `🆕 New Registration: ${company_name} — License Key Needed`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: linear-gradient(135deg, #1e3a5f, #2563eb); padding: 24px; border-radius: 12px 12px 0 0;">
+              <h2 style="color: white; margin: 0;">New CostEasy Cloud Registration</h2>
+            </div>
+            <div style="background: #f8fafc; padding: 28px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0;">
+              <p style="color: #475569;">A new company has registered and needs a license key:</p>
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <tr><td style="padding: 8px 12px; color: #64748b; font-weight: 600;">Company</td><td style="padding: 8px 12px; color: #1e293b; font-weight: 700;">${company_name}</td></tr>
+                <tr style="background: #f1f5f9;"><td style="padding: 8px 12px; color: #64748b; font-weight: 600;">Contact</td><td style="padding: 8px 12px; color: #1e293b;">${name}</td></tr>
+                <tr><td style="padding: 8px 12px; color: #64748b; font-weight: 600;">Email</td><td style="padding: 8px 12px; color: #2563eb; font-weight: 600;">${email.toLowerCase()}</td></tr>
+                <tr style="background: #f1f5f9;"><td style="padding: 8px 12px; color: #64748b; font-weight: 600;">Date</td><td style="padding: 8px 12px; color: #1e293b;">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td></tr>
+              </table>
+              <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-top: 16px;">
+                <strong>👉 Action Required:</strong> Go to <a href="https://costeasy-cloud.vercel.app/admin">Admin Panel</a> to generate and send a license key for this customer.
+              </div>
+              <p style="color: #94a3b8; font-size: 13px; margin-top: 16px;">💡 Hit Reply to respond directly to the customer.</p>
+            </div>
+          </div>
+        `,
+      });
+    } catch (err) {
+      console.error('Admin notification email failed:', err.message);
+    }
+  };
+  sendNotification(); // fire & forget — don't await
+
   res.status(201).json({
-    message: 'Account created. Please email blvttech@gmail.com with your company name to get your license key.',
+    message: 'Account created! Your license key request has been sent to the CostEasy team. You will receive your key via email shortly.',
     company_id: company.id,
     user: { id: user.id, name: user.name, email: user.email },
   });
