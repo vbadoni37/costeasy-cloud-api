@@ -192,11 +192,19 @@ router.post('/', async (req, res) => {
       ...o, value: 0, in_margin: false,
     }));
 
-    const csItems = (bomItems || []).map(b => {
+    // Sort: RM first, then PM, then others
+    const catOrder = { RM: 0, PM: 1, CG: 2, Services: 3, Other: 4 };
+    const sortedBom = [...(bomItems || [])].sort((a, b) =>
+      (catOrder[a.category] ?? 5) - (catOrder[b.category] ?? 5)
+    );
+
+    const csItems = sortedBom.map(b => {
       const priceInfo   = priceMap[b.material_id] || {};
       const basePrice   = parseFloat(priceInfo.price || 0);
       const padding     = parseFloat(priceInfo.padding_percent || 0);
-      const appliedPrice = basePrice * (1 + padding / 100);
+      const adjustment  = 0; // default, editable by cost manager
+      const adjustedPrice = basePrice + adjustment;
+      const appliedPrice = adjustedPrice * (1 + padding / 100);
       const oldRef       = oldPriceMap[b.material_id];
       return {
         material_id:       b.material_id,
@@ -207,13 +215,13 @@ router.post('/', async (req, res) => {
         quantity:          b.quantity,
         padding_percent:   padding,
         base_price:        basePrice,
+        price_adjustment:  adjustment,
         applied_price:     appliedPrice,
         old_base_price:    oldRef?.base_price ?? basePrice,
         old_applied_price: oldRef?.applied_price ?? appliedPrice,
         total_current:     appliedPrice * b.quantity,
         total_old:         (oldRef?.applied_price ?? appliedPrice) * b.quantity,
         is_visible:        true,
-        price_adjustment:  0,
       };
     });
 
